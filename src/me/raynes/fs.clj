@@ -499,3 +499,37 @@
    with-mutable-cwd"
   [path]
   (set! *cwd* (file path)))
+
+(defn- directory-path [file-path]
+    (let [parent-seq (fn [file] (let [dirs-file (clojure.string/split file #"/")] 
+                                    (take (dec (count dirs-file)) dirs-file)))
+          parent-path (parent-seq file-path)]
+        (apply str (map #(str %1 %2) parent-path (conj (vec (take (dec (count parent-path)) (repeatedly #(str "/")))) "")))))
+        
+       
+(defn unzip-entry [^ZipInputStream zs ^ZipEntry ze target-path]
+                    (let [filesize (.getSize ze)
+                          filename (.getName ze)
+                          target-filename (str target-path "/" filename)
+                          dir (directory-path target-filename)
+                          buffer  (byte-array filesize)]
+                          (if (.isDirectory ze)
+                            (mkdir target-filename)
+                            (with-open [output (FileOutputStream. target-filename)]
+                                (println "extracting:" target-filename)
+                                (io/copy zs output)))))
+       
+
+       
+(defn unzip [zip-file target-path]
+    (when (not (directory? target-path))
+        (do (println "mkdir" target-path)
+            (mkdirs target-path)))
+    (with-open [zs (ZipInputStream. (io/input-stream zip-file))]
+        (loop [ze (.getNextEntry zs)]
+            (when (not (nil? ze))
+                (do
+                    (unzip-entry zs ze target-path)
+                    (recur (.getNextEntry zs)))))))  
+
+
